@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import threading
+import random
 
 from speak      import Speaker, SpeakError
 from transcribe import Transcriber, TranscribeError
@@ -9,6 +10,19 @@ from think      import Brain, ThinkError
 from listen     import Listener, ListenError
 from wake       import WakeWordDetector
 from memory     import Memory
+
+THINKING_PHRASES = [
+    "Let me see...",
+    "Hmm, give me a moment...",
+    "Good question, let me think...",
+    "One moment...",
+    "Ah, let me think about that...",
+    "Right, so...",
+    "Interesting, let me see...",
+]
+
+EXIT_PHRASES = ["nevermind", "never mind", "forget it", "stop", "cancel", "exit"]
+MAX_EXCHANGES = 3
 
 
 class Jarvis:
@@ -44,58 +58,83 @@ class Jarvis:
         if self._busy:
             return
         self._busy = True
-        threading.Thread(target=self._handle_query, daemon=True).start()
+        threading.Thread(target=self._conversation, daemon=True).start()
 
-    def _handle_query(self) -> None:
+    def _conversation(self) -> None:
+        """Handle a full conversation context -- up to MAX_EXCHANGES exchanges."""
         try:
-            # Stop wake detector so mic is free for listener
             self.wake.stop()
-            time.sleep(1.0)  # give ALSA time to release
+            time.sleep(1.0)
 
             self.speaker.say("Yes?")
             time.sleep(0.3)
 
-            try:
-                wav_path = self.listener.record()
-            except ListenError as e:
-                print(f"[jarvis] Listen error: {e}")
-                self.speaker.say("Sorry, I couldn't hear you.")
-                return
+            exchanges = 0
 
-            try:
-                question = self.transcriber.transcribe(wav_path)
-            except TranscribeError as e:
-                print(f"[jarvis] Transcribe error: {e}")
-                self.speaker.say("Sorry, I couldn't understand that.")
-                return
-            finally:
-                if os.path.exists(wav_path):
-                    os.unlink(wav_path)
+            while exchanges < MAX_EXCHANGES:
+                # Listen
+                try:
+                    wav_path = self.listener.record()
+                except ListenError as e:
+                    print(f"[jarvis] Listen error: {e}")
+                    self.speaker.say("Sorry, I couldn't hear you.")
+                    break
 
-            if not question.strip():
-                self.speaker.say("I didn't catch that.")
-                return
+                # Transcribe
+                try:
+                    question = self.transcriber.transcribe(wav_path)
+                except TranscribeError as e:
+                    print(f"[jarvis] Transcribe error: {e}")
+                    self.speaker.say("Sorry, I couldn't understand that.")
+                    break
+                finally:
+                    if os.path.exists(wav_path):
+                        os.unlink(wav_path)
 
-            print(f"[jarvis] You said: {question!r}")
-            self.memory.add("user", question)
+                if not question.strip():
+                    self.speaker.say("I didn't catch that.")
+                    break
 
-            try:
-                response = self.brain.chat(self.memory.get_history())
-            except ThinkError as e:
-                print(f"[jarvis] Think error: {e}")
-                self.speaker.say("Sorry, I had trouble thinking of a response.")
-                return
+                print(f"[jarvis] You said: {question!r}")
 
-            print(f"[jarvis] Response: {response!r}")
-            self.memory.add("assistant", response)
+                # Check for exit phrase
+                if any(p in question.lower() for p in EXIT_PHRASES):
+                    self.speaker.say("Sure, let me know if you need anything.")
+                    break
 
-            try:
-                self.speaker.say(response)
-            except SpeakError as e:
-                print(f"[jarvis] Speak error: {e}")
+                # Speak thinking phrase while processing
+                thinking = random.choice(THINKING_PHRASES)
+                self.speaker.say(thinking)
+
+                # Think
+                self.memory.add("user", question)
+                try:
+                    response = self.brain.chat(self.memory.get_history())
+                except ThinkError as e:
+                    print(f"[jarvis] Think error: {e}")
+                    self.speaker.say("Sorry, I had trouble with that one.")
+                    break
+
+                print(f"[jarvis] Response: {response!r}")
+                self.memory.add("assistant", response)
+
+                # Speak response
+                try:
+                    self.speaker.say(response)
+                except SpeakError as e:
+                    print(f"[jarvis] Speak error: {e}")
+                    break
+
+                exchanges += 1
+
+                if exchanges < MAX_EXCHANGES:
+                    # Prompt for follow-up
+                    self.speaker.say("Anything else?")
+                    time.sleep(0.3)
+                else:
+                    self.speaker.say("Let me know if you need anything else.")
 
         finally:
-            # Restart wake detector
             time.sleep(0.3)
             self.wake.start()
             self._busy = False
