@@ -1,26 +1,14 @@
-"""
-wake.py -- OpenWakeWord wake word detection for Jarvis.
-
-Continuously listens for "Hey Jarvis" and calls a callback when detected.
-Runs in a background thread so the main loop stays responsive.
-
-Usage:
-    from wake import WakeWordDetector
-    w = WakeWordDetector(on_wake=lambda: print("Wake word detected!"))
-    w.start()
-    # ... main loop ...
-    w.stop()
-"""
-
 import threading
 import numpy as np
 import sounddevice as sd
+from scipy.signal import resample_poly
 from openwakeword.model import Model
 
 WAKE_WORD_MODEL = "/home/kailash/.local/lib/python3.13/site-packages/openwakeword/resources/models/hey_jarvis_v0.1.onnx"
-SAMPLE_RATE     = 16000
-CHUNK_SIZE      = 1280   # 80ms at 16kHz -- openwakeword requirement
-THRESHOLD       = 0.5    # confidence threshold
+RECORD_RATE     = 44100   # what the mic supports
+TARGET_RATE     = 16000   # what OpenWakeWord needs
+CHUNK_SECS      = 0.08    # 80ms chunks
+THRESHOLD       = 0.5
 
 
 class WakeWordDetector:
@@ -41,24 +29,29 @@ class WakeWordDetector:
         self._running = False
 
     def _listen_loop(self) -> None:
+        chunk_size = int(RECORD_RATE * CHUNK_SECS)
         try:
             with sd.InputStream(
-                samplerate=SAMPLE_RATE,
+                device=1,
+                samplerate=RECORD_RATE,
                 channels=1,
                 dtype="int16",
-                blocksize=CHUNK_SIZE,
+                blocksize=chunk_size,
             ) as stream:
                 while self._running:
-                    chunk, _ = stream.read(CHUNK_SIZE)
-                    audio    = chunk[:, 0] if chunk.ndim > 1 else chunk.flatten()
-                    scores   = self._model.predict(audio)
+                    chunk, _ = stream.read(chunk_size)
+                    audio = chunk.flatten()
 
+                    # Resample from 44100 to 16000
+                    resampled = resample_poly(audio, TARGET_RATE, RECORD_RATE)
+                    resampled = resampled.astype(np.int16)
+
+                    scores = self._model.predict(resampled)
                     for name, score in scores.items():
                         if score >= self.threshold:
                             print(f"[wake] Detected '{name}' with score {score:.2f}")
                             if self._running:
                                 self.on_wake()
-                            # Reset model state after detection
                             self._model.reset()
                             break
 
