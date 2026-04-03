@@ -6,11 +6,11 @@ import os
 
 SAMPLE_RATE    = 44100
 CHANNELS       = 1
-SILENCE_SECS   = 1.5
-MAX_SECS       = 15
-CHUNK_SECS     = 0.1
-VOICE_THRESH   = 0.008   # RMS above this = voice
-SILENCE_THRESH = 0.006   # RMS below this = silence
+VOICE_THRESH   = 0.005   # RMS above this = voice detected
+SILENCE_THRESH = 0.004   # RMS below this = silence
+SILENCE_SECS   = 1.2     # seconds of silence before stopping
+MAX_SECS       = 8       # max recording time
+CHUNK_SECS     = 0.08    # 80ms chunks
 
 
 class ListenError(Exception):
@@ -40,8 +40,9 @@ class Listener:
         silence_chunks = int(self.silence_duration / CHUNK_SECS)
 
         audio_chunks: list[np.ndarray] = []
-        silent_count = 0
-        started      = False
+        silent_count  = 0
+        voice_chunks  = 0
+        started       = False
 
         try:
             with sd.InputStream(
@@ -57,12 +58,14 @@ class Listener:
 
                     if rms > self.voice_threshold:
                         started      = True
-                        silent_count = 0
-                    elif started and rms < self.silence_threshold:
-                        silent_count += 1
-                        if silent_count >= silence_chunks:
-                            print("[listen] Silence detected, stopping.")
-                            break
+                        voice_chunks += 1
+                        silent_count  = 0
+                    else:
+                        if started:
+                            silent_count += 1
+                            if silent_count >= silence_chunks:
+                                print("[listen] Silence detected, stopping.")
+                                break
 
         except sd.PortAudioError as e:
             raise ListenError(f"Microphone error: {e}")
@@ -73,7 +76,8 @@ class Listener:
         audio = np.concatenate(audio_chunks, axis=0)
         tmp   = tempfile.mktemp(suffix=".wav")
         sf.write(tmp, audio, self.sample_rate)
-        print(f"[listen] Recorded {len(audio) / self.sample_rate:.1f}s of audio")
+        duration = len(audio) / self.sample_rate
+        print(f"[listen] Recorded {duration:.1f}s of audio ({voice_chunks} voice chunks)")
         return tmp
 
     def test_microphone(self) -> bool:
@@ -99,7 +103,7 @@ if __name__ == "__main__":
     print("Testing microphone availability...")
     if l.test_microphone():
         print("Microphone is working.")
-        print("Recording for up to 15 seconds -- speak, then be silent for 1.5s to stop.")
+        print("Recording -- speak then stop talking.")
         try:
             path = l.record()
             print(f"Saved to: {path}")
@@ -108,5 +112,5 @@ if __name__ == "__main__":
         except ListenError as e:
             print(f"Error: {e}")
     else:
-        print("No microphone detected -- connect USB mic and retry.")
+        print("No microphone detected.")
     print("listen.py smoke test complete.")

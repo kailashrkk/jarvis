@@ -10,6 +10,7 @@ from think      import Brain, ThinkError
 from listen     import Listener, ListenError
 from wake       import WakeWordDetector
 from memory     import Memory
+from chime      import start_chime, stop_chime, ready_chime, wake_chime
 
 THINKING_PHRASES = [
     "Let me see...",
@@ -43,6 +44,7 @@ class Jarvis:
             sys.exit(1)
 
         print("[jarvis] All systems ready.")
+        ready_chime()
         self.wake.start()
 
         try:
@@ -61,9 +63,9 @@ class Jarvis:
         threading.Thread(target=self._conversation, daemon=True).start()
 
     def _conversation(self) -> None:
-        """Handle a full conversation context -- up to MAX_EXCHANGES exchanges."""
         try:
             self.wake.stop()
+            wake_chime()
             time.sleep(1.0)
 
             self.speaker.say("Yes?")
@@ -102,23 +104,27 @@ class Jarvis:
                     self.speaker.say("Sure, let me know if you need anything.")
                     break
 
-                # Speak thinking phrase while processing
+                # Thinking phrase + chime
                 thinking = random.choice(THINKING_PHRASES)
                 self.speaker.say(thinking)
+                start_chime()
 
                 # Think
                 self.memory.add("user", question)
                 try:
                     response = self.brain.chat(self.memory.get_history())
                 except ThinkError as e:
+                    stop_chime()
                     print(f"[jarvis] Think error: {e}")
                     self.speaker.say("Sorry, I had trouble with that one.")
                     break
+                finally:
+                    stop_chime()
 
                 print(f"[jarvis] Response: {response!r}")
                 self.memory.add("assistant", response)
 
-                # Speak response
+                # Speak
                 try:
                     self.speaker.say(response)
                 except SpeakError as e:
@@ -128,7 +134,6 @@ class Jarvis:
                 exchanges += 1
 
                 if exchanges < MAX_EXCHANGES:
-                    # Prompt for follow-up
                     self.speaker.say("Anything else?")
                     time.sleep(0.3)
                 else:
