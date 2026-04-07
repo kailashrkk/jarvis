@@ -46,7 +46,7 @@ class Listener:
 
         try:
             with sd.InputStream(
-                device=1,
+                device=2,
                 samplerate=self.sample_rate,
                 channels=CHANNELS,
                 dtype="float32",
@@ -84,7 +84,7 @@ class Listener:
         try:
             chunk_size = int(self.sample_rate * 1.0)
             with sd.InputStream(
-                device=1,
+                device=2,
                 samplerate=self.sample_rate,
                 channels=CHANNELS,
                 dtype="float32",

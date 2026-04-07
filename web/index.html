@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=720, initial-scale=1">
+<title>Jarvis</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  width:720px; height:720px;
+  background:#0a0a0f;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:space-between;
+  padding:40px 30px;
+  font-family:system-ui,sans-serif;
+  overflow:hidden;
+}
+.top-bar { width:100%; display:flex; justify-content:space-between; align-items:center; }
+.name { color:#fff; font-size:22px; font-weight:700; letter-spacing:3px; }
+.batt { display:flex; align-items:center; gap:6px; color:#aaa; font-size:14px; }
+.batt-bar { width:44px; height:16px; border:2px solid #555; border-radius:4px; position:relative; overflow:hidden; }
+.batt-fill { position:absolute; left:0; top:0; bottom:0; background:#4ade80; border-radius:2px; transition:width .5s; }
+.batt-tip { width:4px; height:8px; background:#555; border-radius:0 2px 2px 0; margin-left:2px; }
+
+.orb-wrap { position:relative; display:flex; align-items:center; justify-content:center; width:340px; height:340px; cursor:pointer; }
+.ring { position:absolute; border-radius:50%; border:2px solid transparent; animation:spin 4s linear infinite; }
+.ring1 { width:300px; height:300px; border-top-color:#f472b6; border-right-color:#f472b6; animation-duration:3s; }
+.ring2 { width:330px; height:330px; border-bottom-color:#818cf8; border-left-color:#818cf8; animation-duration:5s; animation-direction:reverse; }
+.ring3 { width:360px; height:360px; border-top-color:#34d399; border-left-color:transparent; border-right-color:transparent; border-bottom-color:transparent; animation-duration:7s; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.orb { width:240px; height:240px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background .6s,transform .3s; }
+.orb-core { width:180px; height:180px; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:background .6s; }
+.orb-inner { width:100px; height:100px; border-radius:50%; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; }
+.orb-icon { font-size:40px; }
+
+.pulse-ring { position:absolute; border-radius:50%; border:2px solid rgba(255,255,255,0.3); animation:pulseOut 2s ease-out infinite; }
+@keyframes pulseOut { 0%{width:240px;height:240px;opacity:.6} 100%{width:360px;height:360px;opacity:0} }
+
+.status-label { color:#fff; font-size:28px; font-weight:700; letter-spacing:1px; text-align:center; min-height:38px; transition:color .4s; }
+.status-sub { color:#888; font-size:15px; text-align:center; min-height:22px; margin-top:4px; }
+
+.response-box { width:100%; min-height:60px; background:rgba(255,255,255,0.05); border-radius:12px; padding:14px 20px; color:#ccc; font-size:16px; line-height:1.6; text-align:center; border:1px solid rgba(255,255,255,0.08); transition:opacity .3s; }
+
+.state-dots { display:flex; gap:10px; align-items:center; }
+.dot { width:10px; height:10px; border-radius:50%; opacity:.3; transition:opacity .3s,background .3s; background:#fff; }
+.dot.active { opacity:1; }
+.tap-hint { color:#555; font-size:13px; letter-spacing:1px; margin-top:8px; text-align:center; }
+
+.idle-orb    { background:radial-gradient(circle at 40% 35%,#6366f1,#4f46e5,#1e1b4b); }
+.idle-core   { background:radial-gradient(circle at 40% 35%,#818cf8,#4f46e5); }
+.listen-orb  { background:radial-gradient(circle at 40% 35%,#10b981,#059669,#064e3b); }
+.listen-core { background:radial-gradient(circle at 40% 35%,#34d399,#10b981); }
+.think-orb   { background:radial-gradient(circle at 40% 35%,#f59e0b,#d97706,#451a03); }
+.think-core  { background:radial-gradient(circle at 40% 35%,#fbbf24,#f59e0b); }
+.speak-orb   { background:radial-gradient(circle at 40% 35%,#ec4899,#db2777,#500724); }
+.speak-core  { background:radial-gradient(circle at 40% 35%,#f472b6,#ec4899); }
+
+.wave-bars { display:flex; gap:5px; align-items:center; height:40px; }
+.bar { width:6px; border-radius:3px; background:rgba(255,255,255,0.8); animation:wave .8s ease-in-out infinite; }
+.bar:nth-child(1){animation-delay:0s;height:12px}
+.bar:nth-child(2){animation-delay:.1s;height:20px}
+.bar:nth-child(3){animation-delay:.2s;height:32px}
+.bar:nth-child(4){animation-delay:.3s;height:40px}
+.bar:nth-child(5){animation-delay:.4s;height:32px}
+.bar:nth-child(6){animation-delay:.5s;height:20px}
+.bar:nth-child(7){animation-delay:.6s;height:12px}
+@keyframes wave { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.8)} }
+
+.think-dots { display:flex; gap:8px; align-items:center; }
+.think-dot { width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,0.8); }
+.think-dot:nth-child(1){animation:bounce .9s ease-in-out infinite}
+.think-dot:nth-child(2){animation:bounce .9s ease-in-out .2s infinite}
+.think-dot:nth-child(3){animation:bounce .9s ease-in-out .4s infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="name">JARVIS</div>
+  <div class="batt">
+    <span id="batt-pct">--</span>
+    <div class="batt-bar"><div class="batt-fill" id="batt-fill" style="width:0%"></div></div>
+    <div class="batt-tip"></div>
+  </div>
+</div>
+
+<div class="orb-wrap" onclick="onTap()">
+  <div class="ring ring3"></div>
+  <div class="ring ring2"></div>
+  <div class="ring ring1"></div>
+  <div class="pulse-ring" id="pulse" style="display:none"></div>
+  <div class="orb idle-orb" id="orb">
+    <div class="orb-core idle-core" id="orb-core">
+      <div class="orb-inner">
+        <div id="orb-content"><span class="orb-icon">✦</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div>
+  <div class="status-label" id="status-label">Ready</div>
+  <div class="status-sub" id="status-sub">Say "Hey Jarvis" or tap the orb</div>
+</div>
+
+<div class="response-box" id="response-box">Listening for wake word...</div>
+
+<div>
+  <div class="state-dots">
+    <div class="dot active" id="dot-idle"></div>
+    <div class="dot" id="dot-listening"></div>
+    <div class="dot" id="dot-thinking"></div>
+    <div class="dot" id="dot-speaking"></div>
+  </div>
+  <div class="tap-hint">TAP ORB TO TALK</div>
+</div>
+
+<script>
+const STATES = {
+  idle:      { orb:'idle-orb',   core:'idle-core',   label:'Ready',     sub:'Say "Hey Jarvis" or tap the orb', color:'#fff',     pulse:false, content:'<span class="orb-icon">✦</span>' },
+  listening: { orb:'listen-orb', core:'listen-core', label:'Listening', sub:'Speak your question...',          color:'#34d399',  pulse:true,  content:'<div class="wave-bars"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>' },
+  thinking:  { orb:'think-orb',  core:'think-core',  label:'Thinking',  sub:'Let me think about that...',      color:'#fbbf24',  pulse:false, content:'<div class="think-dots"><div class="think-dot"></div><div class="think-dot"></div><div class="think-dot"></div></div>' },
+  speaking:  { orb:'speak-orb',  core:'speak-core',  label:'Speaking',  sub:'Here\'s what I found...',         color:'#f472b6',  pulse:true,  content:'<span class="orb-icon">♪</span>' },
+};
+
+let ws = null;
+let tapCallback = null;
+
+function setState(name, response, battery) {
+  const s = STATES[name];
+  if (!s) return;
+  document.getElementById('orb').className = 'orb ' + s.orb;
+  document.getElementById('orb-core').className = 'orb-core ' + s.core;
+  document.getElementById('orb-content').innerHTML = s.content;
+  document.getElementById('status-label').textContent = s.label;
+  document.getElementById('status-label').style.color = s.color;
+  document.getElementById('status-sub').textContent = s.sub;
+  document.getElementById('pulse').style.display = s.pulse ? 'block' : 'none';
+  if (response !== undefined && response !== null)
+    document.getElementById('response-box').textContent = response;
+  Object.keys(STATES).forEach(k => document.getElementById('dot-' + k).classList.remove('active'));
+  document.getElementById('dot-' + name).classList.add('active');
+  if (battery !== undefined) {
+    document.getElementById('batt-pct').textContent = battery + '%';
+    document.getElementById('batt-fill').style.width = battery + '%';
+    document.getElementById('batt-fill').style.background = battery > 30 ? '#4ade80' : battery > 15 ? '#fbbf24' : '#f87171';
+  }
+}
+
+function onTap() {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({type:'tap'}));
+  }
+}
+
+function connect() {
+  ws = new WebSocket('ws://localhost:8765');
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    setState(msg.state, msg.response, msg.battery);
+  };
+  ws.onclose = () => setTimeout(connect, 2000);
+  ws.onerror = () => ws.close();
+}
+
+setState('idle', 'Connecting to Jarvis...', null);
+connect();
+</script>
+</body>
+</html>

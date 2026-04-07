@@ -74,7 +74,7 @@ class Speaker:
     def _play(self, wav_path: str) -> None:
         try:
             result = subprocess.run(
-                ["aplay", wav_path],
+                ["aplay", "-D", "plughw:2,0", wav_path],
                 capture_output=True,
                 timeout=30,
             )

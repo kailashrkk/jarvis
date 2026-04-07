@@ -32,7 +32,7 @@ class WakeWordDetector:
         chunk_size = int(RECORD_RATE * CHUNK_SECS)
         try:
             with sd.InputStream(
-                device=1,
+                device=2,
                 samplerate=RECORD_RATE,
                 channels=1,
                 dtype="int16",

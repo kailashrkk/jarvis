@@ -11,6 +11,7 @@ from listen     import Listener, ListenError
 from wake       import WakeWordDetector
 from memory     import Memory
 from chime      import start_chime, stop_chime, ready_chime, wake_chime
+import server
 
 THINKING_PHRASES = [
     "Let me see...",
@@ -44,6 +45,9 @@ class Jarvis:
             sys.exit(1)
 
         print("[jarvis] All systems ready.")
+        server.start()
+        server.set_tap_callback(self._on_wake)
+        server.set_state("idle", "Listening for wake word...", 100)
         ready_chime()
         self.wake.start()
 
@@ -65,6 +69,7 @@ class Jarvis:
     def _conversation(self) -> None:
         try:
             self.wake.stop()
+            server.set_state("listening", "Speak your question...")
             wake_chime()
             time.sleep(1.0)
 
@@ -108,6 +113,7 @@ class Jarvis:
                 thinking = random.choice(THINKING_PHRASES)
                 self.speaker.say(thinking)
                 start_chime()
+                server.set_state("thinking", "Let me think about that...")
 
                 # Think
                 self.memory.add("user", question)
@@ -127,6 +133,7 @@ class Jarvis:
                 # Speak
                 try:
                     self.speaker.say(response)
+                    server.set_state("speaking", response)
                 except SpeakError as e:
                     print(f"[jarvis] Speak error: {e}")
                     break
@@ -142,6 +149,7 @@ class Jarvis:
         finally:
             time.sleep(0.3)
             self.wake.start()
+            server.set_state("idle", "Listening for wake word...")
             self._busy = False
 
 
