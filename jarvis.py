@@ -59,7 +59,7 @@ class Jarvis:
         threading.Thread(target=_battery_loop, daemon=True).start()
 
         server.set_tap_callback(self._on_wake)
-        server.set_state("idle", "Listening for wake word...", 100)
+        server.set_state("idle", "Listening for wake word...", battery.get_percent())
         ready_chime()
         self.wake.start()
 
