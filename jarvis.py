@@ -123,6 +123,18 @@ class Jarvis:
 
                 # Check for app launch commands
                 q = question.lower()
+                if any(p in q for p in ["shut down", "shutdown", "power off", "poweroff", "turn off"]):
+                    self.speaker.say("Shutting down. Goodbye.")
+                    time.sleep(2)
+                    subprocess.run(["sudo", "poweroff"])
+                    break
+
+                if any(p in q for p in ["reboot", "restart", "restart jarvis"]):
+                    self.speaker.say("Rebooting now.")
+                    time.sleep(2)
+                    subprocess.run(["sudo", "reboot"])
+                    break
+
                 if any(p in q for p in ["close retroarch", "exit retroarch", "quit retroarch", "close games", "exit games", "close retro arc", "exit retro arc", "quit retro arc", "close the retro", "exit the retro"]):
                     self.speaker.say("Closing RetroArch.")
                     subprocess.run(["pkill", "retroarch"], stderr=subprocess.DEVNULL)
