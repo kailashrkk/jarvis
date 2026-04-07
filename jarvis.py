@@ -13,6 +13,9 @@ from wake       import WakeWordDetector
 from memory     import Memory
 from chime      import start_chime, stop_chime, ready_chime, wake_chime
 import server
+from commands import COMMANDS
+import actions
+ACTIONS = {k: getattr(actions, k) for k in dir(actions) if not k.startswith("_")}
 import battery
 
 THINKING_PHRASES = [
@@ -121,43 +124,16 @@ class Jarvis:
                     self.speaker.say("Sure, let me know if you need anything.")
                     break
 
-                # Check for app launch commands
+                # Dispatch voice commands
                 q = question.lower()
-                if any(p in q for p in ["shut down", "shutdown", "power off", "poweroff", "turn off"]):
-                    self.speaker.say("Shutting down. Goodbye.")
-                    time.sleep(2)
-                    subprocess.run(["sudo", "poweroff"])
+                matched = False
+                for cmd in COMMANDS:
+                    if any(p in q for p in cmd["phrases"]):
+                        ACTIONS[cmd["action"]](self.speaker, server)
+                        matched = True
+                        break
+                if matched:
                     break
-
-                if any(p in q for p in ["reboot", "restart", "restart jarvis"]):
-                    self.speaker.say("Rebooting now.")
-                    time.sleep(2)
-                    subprocess.run(["sudo", "reboot"])
-                    break
-
-                if any(p in q for p in ["close retroarch", "exit retroarch", "quit retroarch", "close games", "exit games", "close retro arc", "exit retro arc", "quit retro arc", "close the retro", "exit the retro"]):
-                    self.speaker.say("Closing RetroArch.")
-                    subprocess.run(["pkill", "retroarch"], stderr=subprocess.DEVNULL)
-                    subprocess.Popen(
-                        ["chromium", "--kiosk", "--password-store=basic",
-                         "--disable-infobars", "--noerrdialogs",
-                         "--disable-session-crashed-bubble", "http://localhost:8090"],
-                        env={**os.environ, "DISPLAY": ":1"},
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
-                    break
-
-                if any(p in q for p in ["open retroarch", "launch retroarch", "open retro arch", "play games", "open games"]):
-                    self.speaker.say("Opening RetroArch.")
-                    server.set_state("idle", "RetroArch running...")
-                    subprocess.run(["pkill", "chromium"], stderr=subprocess.DEVNULL)
-                    subprocess.Popen(
-                        ["retroarch"],
-                        env={**os.environ, "DISPLAY": ":1"},
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
                     break
 
                 # Thinking phrase + chime
