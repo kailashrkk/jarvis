@@ -12,6 +12,8 @@ from wake       import WakeWordDetector
 from memory     import Memory
 from chime      import start_chime, stop_chime, ready_chime, wake_chime
 import server
+import battery
+import battery
 
 THINKING_PHRASES = [
     "Let me see...",
@@ -46,6 +48,16 @@ class Jarvis:
 
         print("[jarvis] All systems ready.")
         server.start()
+
+        def _battery_loop():
+            while self._running:
+                pct = battery.get_percent()
+                if pct >= 0:
+                    server.set_state('idle', battery=pct)
+                time.sleep(60)
+
+        threading.Thread(target=_battery_loop, daemon=True).start()
+
         server.set_tap_callback(self._on_wake)
         server.set_state("idle", "Listening for wake word...", 100)
         ready_chime()
