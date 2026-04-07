@@ -3,6 +3,7 @@ import sys
 import time
 import threading
 import random
+import subprocess
 
 from speak      import Speaker, SpeakError
 from transcribe import Transcriber, TranscribeError
@@ -12,7 +13,6 @@ from wake       import WakeWordDetector
 from memory     import Memory
 from chime      import start_chime, stop_chime, ready_chime, wake_chime
 import server
-import battery
 import battery
 
 THINKING_PHRASES = [
@@ -119,6 +119,33 @@ class Jarvis:
                 # Check for exit phrase
                 if any(p in question.lower() for p in EXIT_PHRASES):
                     self.speaker.say("Sure, let me know if you need anything.")
+                    break
+
+                # Check for app launch commands
+                q = question.lower()
+                if any(p in q for p in ["close retroarch", "exit retroarch", "quit retroarch", "close games", "exit games", "close retro arc", "exit retro arc", "quit retro arc", "close the retro", "exit the retro"]):
+                    self.speaker.say("Closing RetroArch.")
+                    subprocess.run(["pkill", "retroarch"], stderr=subprocess.DEVNULL)
+                    subprocess.Popen(
+                        ["chromium", "--kiosk", "--password-store=basic",
+                         "--disable-infobars", "--noerrdialogs",
+                         "--disable-session-crashed-bubble", "http://localhost:8090"],
+                        env={**os.environ, "DISPLAY": ":1"},
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                    break
+
+                if any(p in q for p in ["open retroarch", "launch retroarch", "open retro arch", "play games", "open games"]):
+                    self.speaker.say("Opening RetroArch.")
+                    server.set_state("idle", "RetroArch running...")
+                    subprocess.run(["pkill", "chromium"], stderr=subprocess.DEVNULL)
+                    subprocess.Popen(
+                        ["retroarch"],
+                        env={**os.environ, "DISPLAY": ":1"},
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
                     break
 
                 # Thinking phrase + chime
